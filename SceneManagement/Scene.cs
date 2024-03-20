@@ -20,13 +20,14 @@
 using ScapeCore.Core.Batching.Tools;
 using ScapeCore.Core.Collections.Pooling;
 using ScapeCore.Core.Engine;
-using Serilog;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+
+using static ScapeCore.Traceability.Debug.Debugger;
 
 namespace ScapeCore.Core.SceneManagement
 {
@@ -69,8 +70,7 @@ namespace ScapeCore.Core.SceneManagement
                     if (b)
                         generatorCompletionReference.CompletionReference.SetResult(deeplyMutable);
                     else
-                        Log.Error("Scene {name} encountered a problem while instantiating an invocation." +
-                            " Stack wasn't able to pop the {tcs} for the current instantiation, but item was correctly instantiated.", name, typeof(TaskCompletionSource<DeeplyMutableType>));
+                        SCLog.Log(ERROR, $"Scene {name} encountered a problem while instantiating an invocation. Stack wasn't able to pop the {typeof(TaskCompletionSource<DeeplyMutableType>)} for the current instantiation, but item was correctly instantiated.");
                 }
             }
             while (!_cancellationTokenSource.IsCancellationRequested);
@@ -86,7 +86,7 @@ namespace ScapeCore.Core.SceneManagement
             }
             catch (Exception ex)
             {
-                Log.Error("Scene {name} encountered a problem while instantiating object of type {t}\t:\t{ex}", name, type, ex.Message);
+                SCLog.Log(ERROR, $"Scene {name} encountered a problem while instantiating object of type {type}\t:\t{ex.Message}");
                 return false;
             }
             return true;
@@ -102,8 +102,8 @@ namespace ScapeCore.Core.SceneManagement
         private void AddToTrackers(dynamic result)
         {
             if (result == null) return;
-            _monoBehaviours.Add(result);
-            _gameObjects.Add(result.gameObject!);
+            MonoBehaviours.Add(result);
+            GameObjects.Add(result.gameObject!);
         }
 
         public async Task<T?> AddToSceneAsync<T>() where T : MonoBehaviour
@@ -160,27 +160,27 @@ namespace ScapeCore.Core.SceneManagement
 
         public void RemoveFromScene(MonoBehaviour monoBehaviour)
         {
-            if (_monoBehaviours.Contains(monoBehaviour))
+            if (MonoBehaviours.Contains(monoBehaviour))
             {
-                _monoBehaviours.Remove(monoBehaviour);
+                MonoBehaviours.Remove(monoBehaviour);
                 monoBehaviour.Destroy();
                 if (_typePools.ContainsKey(monoBehaviour.GetType()))
                     _typePools[monoBehaviour.GetType()].Return(new(monoBehaviour));
             }
             else
-                Log.Warning("Cant remove a MonoBehaviour that is not contained on the scene.");
+                SCLog.Log(WARNING, "Cant remove a MonoBehaviour that is not contained on the scene.");
         }
         public void RemoveFromScene(GameObject gameObject)
         {
-            if (_gameObjects.Contains(gameObject))
+            if (GameObjects.Contains(gameObject))
             {
-                _gameObjects.Remove(gameObject);
+                GameObjects.Remove(gameObject);
                 gameObject.Destroy();
                 if (_typePools.ContainsKey(gameObject.GetType()))
                     _typePools[gameObject.GetType()].Return(new(gameObject));
             }
             else
-                Log.Warning("Cant remove a GameObject that is not contained on the scene.");
+                SCLog.Log(WARNING, "Cant remove a GameObject that is not contained on the scene.");
         }
 
         public void Find<T>(T monoBehaviour) where T : Behaviour

@@ -19,12 +19,14 @@
  * scenes within the application.
  */
 
-using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.InteropServices;
+
+using static ScapeCore.Traceability.Debug.Debugger;
 
 namespace ScapeCore.Core.SceneManagement
 {
@@ -43,7 +45,7 @@ namespace ScapeCore.Core.SceneManagement
             if (_scenes.TryGetValue(sceneId, out var scene))
                 return scene;
             else
-                Log.Error("Scene with ID {id} not found in the SceneManager", sceneId);
+                SCLog.Log(ERROR, $"Scene with ID {sceneId} not found in the SceneManager");
             return null;
         }
         public static int AddScene(Scene scene)
@@ -52,7 +54,7 @@ namespace ScapeCore.Core.SceneManagement
                 _scenes.TryAdd(0, scene);
             else if (!_scenes.TryAdd(_scenes.Last().Key + 1, scene))
             {
-                Log.Error("There was a problem whilst trying to add Scene {s} to the SceneManager", scene.name);
+                SCLog.Log(ERROR, $"There was a problem whilst trying to add Scene {scene.name} to the SceneManager");
                 return -1;
             }
             _scenesCount++;
@@ -64,7 +66,7 @@ namespace ScapeCore.Core.SceneManagement
                 return -1;
             if (!_scenes.TryRemove(sceneId, out var scene))
             {
-                Log.Error("There was a problem whilst trying to remove scene {s} to the SceneManager", scene?.name);
+                SCLog.Log(ERROR, $"There was a problem whilst trying to remove scene {scene?.name} to the SceneManager");
                 return -1;
             }
             _scenesCount--;
