@@ -17,7 +17,7 @@
  * Sceme Management system.
  */
 
-using ScapeCore.Core.Batching.Tools;
+using ScapeCore.Core.Tools;
 using ScapeCore.Core.Collections.Pooling;
 using ScapeCore.Core.Engine;
 using System;
@@ -27,13 +27,13 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-using static ScapeCore.Traceability.Debug.Debugger;
+using static ScapeCore.Core.Debug.Debugger;
 
 namespace ScapeCore.Core.SceneManagement
 {
-    public class Scene : IDisposable
+    public class Scene : IScene
     {
-        public string name = "Scene";
+        private string _name = "Scene";
         public int sceneIndex = 0;
         private bool disposedValue;
         private readonly ConcurrentDictionary<Type, ObjectPool> _typePools = new();
@@ -41,6 +41,7 @@ namespace ScapeCore.Core.SceneManagement
         private readonly List<MonoBehaviour> _monoBehaviours = new();
         private readonly List<GameObject> _gameObjects = new();
 
+        public string Name { get => _name; set => _name = value; }
         public IList MonoBehaviours { get => ArrayList.Synchronized(_monoBehaviours); }
         public IList GameObjects { get => ArrayList.Synchronized(_gameObjects); }
 
@@ -52,10 +53,10 @@ namespace ScapeCore.Core.SceneManagement
 
         public Scene() => _instantiateInvocations = Task.Run(InstantiateInvocations);
         public Scene(int sceneIndex) : this() => this.sceneIndex = sceneIndex;
-        public Scene(string name) : this() => this.name = name;
+        public Scene(string name) : this() => this._name = name;
         public Scene(string name, int sceneIndex) : this()
         {
-            this.name = name;
+            this._name = name;
             this.sceneIndex = sceneIndex;
         }
 
@@ -70,7 +71,7 @@ namespace ScapeCore.Core.SceneManagement
                     if (b)
                         generatorCompletionReference.CompletionReference.SetResult(deeplyMutable);
                     else
-                        SCLog.Log(ERROR, $"Scene {name} encountered a problem while instantiating an invocation. Stack wasn't able to pop the {typeof(TaskCompletionSource<DeeplyMutableType>)} for the current instantiation, but item was correctly instantiated.");
+                        SCLog.Log(ERROR, $"Scene {_name} encountered a problem while instantiating an invocation. Stack wasn't able to pop the {typeof(TaskCompletionSource<DeeplyMutableType>)} for the current instantiation, but item was correctly instantiated.");
                 }
             }
             while (!_cancellationTokenSource.IsCancellationRequested);
@@ -86,7 +87,7 @@ namespace ScapeCore.Core.SceneManagement
             }
             catch (Exception ex)
             {
-                SCLog.Log(ERROR, $"Scene {name} encountered a problem while instantiating object of type {type}\t:\t{ex.Message}");
+                SCLog.Log(ERROR, $"Scene {_name} encountered a problem while instantiating object of type {type}\t:\t{ex.Message}");
                 return false;
             }
             return true;
@@ -181,11 +182,6 @@ namespace ScapeCore.Core.SceneManagement
             }
             else
                 SCLog.Log(WARNING, "Cant remove a GameObject that is not contained on the scene.");
-        }
-
-        public void Find<T>(T monoBehaviour) where T : Behaviour
-        {
-
         }
 
         protected virtual void Dispose(bool disposing)
