@@ -99,12 +99,42 @@ namespace ScapeCore.Core.SceneManagement
 
             foreach(var service in services)
             {
-                if (service is IScene)
-                    AddScene(service as IScene);
+                if (service is IScene) AddScene(service as IScene);
                 else return false;
             }
 
             return true;
         }
+
+        private bool ExtractDependenciesLocal(params IScapeCoreService[] services)
+        {
+            if (services.Length <= 0) return false;
+
+            foreach (var service in services)
+            {
+                if (service is IScene scene)
+                {
+                    var i = _scenes.Values.ToList().IndexOf(scene);
+                    if (i == -1) return false;
+                    var h = RemoveScene(i);
+                    if (h == -1) return false;
+                }
+                else return false;
+            }
+
+            return true;
+        }
+
+        bool IScapeCoreManager.ExtractDependencies(params IScapeCoreService[] services)
+        {
+            var result = services.Length <= 0 ? ExtractDependenciesLocal([.. _scenes.Values]) :
+                                                ExtractDependenciesLocal(services);
+            if (result == false)
+                throw new ArgumentException($"The dependencies extracted from this {nameof(SceneManager)} are not valid. Check if they are correct and try again.");
+            else
+                SCLog.Log(DEBUG, $"Dependencies were succesfully extracted from {nameof(SceneManager)}.");
+            return result;
+        }
+
     }
 }
