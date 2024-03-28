@@ -45,6 +45,9 @@ namespace ScapeCore.Core.SceneManagement
         public IList MonoBehaviours { get => ArrayList.Synchronized(_monoBehaviours); }
         public IList GameObjects { get => ArrayList.Synchronized(_gameObjects); }
 
+        private readonly Guid _id = Guid.NewGuid();
+        public Guid Id => _id;
+
         private readonly record struct GeneratorCompletionReference(Func<DeeplyMutableType, bool> Generator, TaskCompletionSource<DeeplyMutableType> CompletionReference);
         private readonly ConcurrentStack<GeneratorCompletionReference> _objectGeneratorCompletionReferences = new();
 
@@ -123,9 +126,10 @@ namespace ScapeCore.Core.SceneManagement
             {
                 Parallel.For(0, cuantity, async (int i) =>
                 {
-                    var result = (await PushInstantiation(Instantiate)).Value;
+                    T result = (await PushInstantiation(Instantiate)).Value;
                     AddToTrackers(result);
                     results.Add(result);
+                    SCLog?.Log(VERBOSE, $"{result.name} [{result.Id}] was created on scene \"{Name}\".");
                 });
             });
             return results;

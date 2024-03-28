@@ -58,7 +58,7 @@ namespace ScapeCore.Core.SceneManagement
             if (_scenes.TryGetValue(sceneId, out var scene))
                 return scene;
             else
-                SCLog.Log(ERROR, $"Scene with ID {sceneId} not found in the SceneManager");
+                SCLog?.Log(ERROR, $"Scene with ID {sceneId} not found in the SceneManager");
             return null;
         }
         public int AddScene(IScene scene)
@@ -67,7 +67,7 @@ namespace ScapeCore.Core.SceneManagement
                 _scenes.TryAdd(0, scene);
             else if (!_scenes.TryAdd(_scenes.Last().Key + 1, scene))
             {
-                SCLog.Log(ERROR, $"There was a problem whilst trying to add Scene {scene.Name} to the SceneManager");
+                SCLog?.Log(ERROR, $"There was a problem whilst trying to add Scene {scene.Name} to the SceneManager");
                 return -1;
             }
             _scenesCount++;
@@ -79,7 +79,7 @@ namespace ScapeCore.Core.SceneManagement
                 return -1;
             if (!_scenes.TryRemove(sceneId, out var scene))
             {
-                SCLog.Log(ERROR, $"There was a problem whilst trying to remove scene {scene?.Name} to the SceneManager");
+                SCLog?.Log(ERROR, $"There was a problem whilst trying to remove scene {scene?.Name} to the SceneManager");
                 return -1;
             }
             _scenesCount--;
@@ -99,7 +99,7 @@ namespace ScapeCore.Core.SceneManagement
 
             foreach(var service in services)
             {
-                if (service is IScene) AddScene(service as IScene);
+                if (service is IScene scene) AddScene(scene);
                 else return false;
             }
 
@@ -111,28 +111,31 @@ namespace ScapeCore.Core.SceneManagement
             if (services.Length <= 0) return false;
 
             foreach (var service in services)
-            {
                 if (service is IScene scene)
                 {
-                    var i = _scenes.Values.ToList().IndexOf(scene);
+                    var i = _scenes.Keys.ToArray()[_scenes.Values.ToList().IndexOf(scene)];
                     if (i == -1) return false;
                     var h = RemoveScene(i);
                     if (h == -1) return false;
+                    scene.Dispose();
                 }
                 else return false;
-            }
 
             return true;
         }
 
         bool IScapeCoreManager.ExtractDependencies(params IScapeCoreService[] services)
         {
-            var result = services.Length <= 0 ? ExtractDependenciesLocal([.. _scenes.Values]) :
-                                                ExtractDependenciesLocal(services);
+            var servicesToExtract = services.Length <= 0 ? _scenes.Values.ToArray() : services;
+            var result = ExtractDependenciesLocal(servicesToExtract);
+            var strs = new List<string>();
+            foreach (var service in servicesToExtract)
+                strs.Add($"\"{service.Name}\"");
             if (result == false)
-                throw new ArgumentException($"The dependencies extracted from this {nameof(SceneManager)} are not valid. Check if they are correct and try again.");
+                throw new ArgumentException($"The {nameof(IScene)} extracted from this {nameof(SceneManager)} are not valid. Check if they are correct and try again. Alternatively dependencies could be null.");
             else
-                SCLog.Log(DEBUG, $"Dependencies were succesfully extracted from {nameof(SceneManager)}.");
+                SCLog?.Log(DEBUG, strs.Count == 1 ? $"Scene {strs[0]} was succesfully extracted from {nameof(SceneManager)}." : 
+                                                    $"Scenes {string.Join(", ", strs)} were succesfully extracted from {nameof(SceneManager)}.");
             return result;
         }
 
