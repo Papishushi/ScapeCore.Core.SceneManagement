@@ -28,6 +28,9 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using static ScapeCore.Core.Debug.Debugger;
+using ScapeCore.Traceability.Logging;
+using static System.Formats.Asn1.AsnWriter;
+using System.Xml.Linq;
 
 namespace ScapeCore.Core.SceneManagement
 {
@@ -74,7 +77,7 @@ namespace ScapeCore.Core.SceneManagement
                     if (b)
                         generatorCompletionReference.CompletionReference.SetResult(deeplyMutable);
                     else
-                        SCLog.Log(ERROR, $"Scene {_name} encountered a problem while instantiating an invocation. Stack wasn't able to pop the {typeof(TaskCompletionSource<DeeplyMutableType>)} for the current instantiation, but item was correctly instantiated.");
+                        SCLog?.Log(ERROR, $"Scene {_name} encountered a problem while instantiating an invocation. Stack wasn't able to pop the {typeof(TaskCompletionSource<DeeplyMutableType>)} for the current instantiation, but item was correctly instantiated.");
                 }
             }
             while (!_cancellationTokenSource.IsCancellationRequested);
@@ -90,7 +93,7 @@ namespace ScapeCore.Core.SceneManagement
             }
             catch (Exception ex)
             {
-                SCLog.Log(ERROR, $"Scene {_name} encountered a problem while instantiating object of type {type}\t:\t{ex.Message}");
+                SCLog?.Log(ERROR, $"Scene {_name} encountered a problem while instantiating object of type {type}\t:\t{ex.Message}");
                 return false;
             }
             return true;
@@ -169,11 +172,10 @@ namespace ScapeCore.Core.SceneManagement
             {
                 MonoBehaviours.Remove(monoBehaviour);
                 monoBehaviour.Destroy();
-                if (_typePools.ContainsKey(monoBehaviour.GetType()))
-                    _typePools[monoBehaviour.GetType()].Return(new(monoBehaviour));
+                ReturnToTypePool(monoBehaviour);
             }
             else
-                SCLog.Log(WARNING, "Cant remove a MonoBehaviour that is not contained on the scene.");
+                SCLog?.Log(WARNING, "Cant remove a MonoBehaviour that is not contained on the scene.");
         }
         public void RemoveFromScene(GameObject gameObject)
         {
@@ -181,12 +183,88 @@ namespace ScapeCore.Core.SceneManagement
             {
                 GameObjects.Remove(gameObject);
                 gameObject.Destroy();
-                if (_typePools.ContainsKey(gameObject.GetType()))
-                    _typePools[gameObject.GetType()].Return(new(gameObject));
+                ReturnToTypePool(gameObject);
             }
             else
-                SCLog.Log(WARNING, "Cant remove a GameObject that is not contained on the scene.");
+            {
+                ExecuteAction((node, depth) =>
+                {
+                    if (node.Id == gameObject.Id)
+                    {
+                        gameObject.parent?.children.Remove(gameObject);
+                        gameObject.Destroy();
+                        ReturnToTypePool(gameObject);
+                        return ExecuteActionState.RETURN;
+                    }
+                    return ExecuteActionState.NONE;
+                });
+
+            }
         }
+
+        public enum ExecuteActionState
+        {
+            NONE,
+            RETURN,
+            CONTINUE,
+            BREAK
+        }
+        public void ExecuteAction(Func<GameObject, int, ExecuteActionState> action)
+        {
+            foreach (GameObject? gameObject in GameObjects)
+            {
+                if (gameObject == null)
+                    continue;
+
+                var stack = new Stack<Tuple<GameObject, int>>();
+                stack.Push(new(gameObject, 0));
+
+                while (stack.Count > 0)
+                {
+                    var tuple = stack.Pop();
+                    var selectedChildren = tuple.Item1;
+                    var selectedTabCount = tuple.Item2;
+
+                    var state = action(selectedChildren, selectedTabCount);
+
+                    bool breakLoop = false;
+                    switch (state)
+                    {
+                        case ExecuteActionState.CONTINUE:
+                            continue;
+                        case ExecuteActionState.BREAK:
+                            breakLoop = true; 
+                            break;
+                        case ExecuteActionState.RETURN:
+                            return;
+                        case ExecuteActionState.NONE:
+                            break;
+                    }
+                    if (breakLoop) break;
+
+                    selectedTabCount++;
+
+                    // Push children onto the stack in reverse order to maintain the correct order during traversal
+                    for (int i = selectedChildren.children.Count - 1; i >= 0; i--)
+                        stack.Push(new Tuple<GameObject, int>(selectedChildren.children[i], selectedTabCount));
+
+                }
+            }
+        }
+
+        public void ReturnToTypePool<T>(T instance)
+        {
+            if (_typePools.TryGetValue(typeof(T), out ObjectPool? value))
+                value.Return(new(instance));
+        }
+
+        public T? GetFromTypePool<T>()
+        {
+            if (_typePools.TryGetValue(typeof(T), out ObjectPool? value))
+                return value.Get.Value;
+            return default;
+        }
+
 
         protected virtual void Dispose(bool disposing)
         {
